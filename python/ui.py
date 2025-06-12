@@ -8,6 +8,7 @@ from PyQt5.QtGui import QFont
 import sys
 from rs232 import SerialKing
 from rs232 import SerialReaderThread
+from rs232 import Flow
 import time
 
 class MainWindow(QMainWindow):
@@ -89,9 +90,26 @@ class MainWindow(QMainWindow):
     def send_data(self):
         data = self.write_text.toPlainText()
         if data:
-            data : str = data + self.serialKing.terminator
-            self.serialKing.write(data=data.encode())
-            self.write_text.clear()
+            data: str = data + self.serialKing.terminator
+            data_bytes = data.encode()
+            if self.serialKing.flow_control != Flow.DTR_DSR.value:
+                self.serialKing.write(data=data_bytes)
+                self.write_text.clear()
+            else:
+                self.reader_thread.sending_data = True
+                timeout = 1
+                start_time = time.time()
+                while not self.serialKing.get_dsr():
+                    if time.time() - start_time > timeout:
+                        self.serialKing.set_dtr()
+                        print("DSR not received within timeout.")
+                        self.reader_thread.sending_data = False
+                        return
+                    time.sleep(0.01)
+
+                self.reader_thread.sending_data = False
+                self.serialKing.write(data_bytes)
+                self.write_text.clear()
 
     def clear(self):
         self.read_text.clear()
@@ -117,7 +135,7 @@ class MainWindow(QMainWindow):
 
     def update_read_text(self, data):
         print(data)
-        self.read_text.append(data)
+        self.read_text.insertPlainText(data)
 
     def closeEvent(self, event):
         self.reader_thread.stop()

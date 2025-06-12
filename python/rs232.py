@@ -110,9 +110,7 @@ class SerialKing:
         elif self.parity == Parity.ODD.value:
             self.tty_settings[2] |= termios.PARENB
             self.tty_settings[2] |= termios.PARODD
-  
-      
-        
+
         #Stop bits/bit
         if self.stopbits == 2:
             self.tty_settings[2] |= termios.CSTOPB
@@ -153,7 +151,7 @@ class SerialKing:
         buf[0] = status
         fcntl.ioctl(self.fd, TIOCMSET, buf)
     
-    def get_dsr(self):
+    def get_dsr(self) -> bool:
         buf = array.array('i', [0])
         fcntl.ioctl(self.fd, TIOCMGET, buf)
         status = buf[0]
@@ -161,17 +159,12 @@ class SerialKing:
         return dsr
 
     def write(self, data):
-        
-        # if not data.endswith(self.terminator):
-        #     data += self.terminator
-            
-        print('write data')
         os.write(self.fd, data)
 
 
     def read(self, size=1) -> bytes:
 
-        rlist, _, _ = select.select([self.fd], [], [], 0.1)
+        rlist, _, _ = select.select([self.fd], [], [], 0.01)
         if rlist:
             return os.read(self.fd, size)
         return b''
@@ -182,16 +175,23 @@ class SerialKing:
 class SerialReaderThread(QThread):
     data_received = pyqtSignal(str)
 
-    def __init__(self, serial_king):
+    def __init__(self, serial_king : SerialKing):
         super().__init__()
         self.serial_king = serial_king
         self._running = True
         self.pong_received = False
+        self.sending_data = False
 
     def run(self):
         buffer = ''
         while self._running:
             chunk = self.serial_king.read(1)
+            if self.serial_king.flow_control == Flow.DTR_DSR.value and not self.sending_data:
+                if self.serial_king.get_dsr():
+                    self.serial_king.set_dtr()
+                if not self.serial_king.get_dsr():
+                    self.serial_king.clear_dtr()
+
             if chunk == b'\x00':
                 print('ping')
                 self.serial_king.write(data=b'\x16')
@@ -204,7 +204,7 @@ class SerialReaderThread(QThread):
                 buffer += chunk.decode(errors='ignore')
                 print(' '.join(f"0x{byte:02x}" for byte in chunk))
                 if buffer.endswith(self.serial_king.terminator):
-                    self.data_received.emit(buffer)
+                    self.data_received.emit(buffer[:-len(self.serial_king.terminator)] + '\n')
                     buffer = ''
 
     def stop(self):
