@@ -160,13 +160,13 @@ class SerialKing:
         dsr = bool(status & TIOCM_DSR)
         return dsr
 
-    def write(self, data: str):
+    def write(self, data):
         
-        if not data.endswith(self.terminator):
-            data += self.terminator
+        # if not data.endswith(self.terminator):
+        #     data += self.terminator
             
         print('write data')
-        os.write(self.fd, data.encode())
+        os.write(self.fd, data)
 
 
     def read(self, size=1) -> bytes:
@@ -186,11 +186,20 @@ class SerialReaderThread(QThread):
         super().__init__()
         self.serial_king = serial_king
         self._running = True
+        self.pong_received = False
 
     def run(self):
         buffer = ''
         while self._running:
             chunk = self.serial_king.read(1)
+            if chunk == b'\x00':
+                print('ping')
+                self.serial_king.write(data=b'\x16')
+                chunk = b''
+            if chunk == b'\x16':
+                print('pong')
+                self.pong_received = True
+                chunk = b''
             if chunk:
                 buffer += chunk.decode(errors='ignore')
                 print(' '.join(f"0x{byte:02x}" for byte in chunk))

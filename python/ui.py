@@ -8,7 +8,7 @@ from PyQt5.QtGui import QFont
 import sys
 from rs232 import SerialKing
 from rs232 import SerialReaderThread
-
+import time
 
 class MainWindow(QMainWindow):
     def __init__(self, _serialKing : SerialKing):
@@ -89,7 +89,8 @@ class MainWindow(QMainWindow):
     def send_data(self):
         data = self.write_text.toPlainText()
         if data:
-            self.serialKing.write(data=data + self.serialKing.terminator)
+            data : str = data + self.serialKing.terminator
+            self.serialKing.write(data=data.encode())
             self.write_text.clear()
 
     def clear(self):
@@ -97,7 +98,22 @@ class MainWindow(QMainWindow):
         pass
 
     def ping(self):
-        pass
+        self.reader_thread.pong_received = False  # Resetuj flagę
+        start_time = time.time()
+
+        self.serialKing.write(data=b'\x00')
+
+        timeout = 3
+        while time.time() - start_time < timeout:
+            QApplication.processEvents()
+            if self.reader_thread.pong_received:
+                elapsed = (time.time() - start_time) * 1000
+                self.ping_label.setText(f"Ping[ms]: {elapsed:.2f}")
+                return
+
+        self.ping_label.setText("Ping timeout (>3s)")
+
+
 
     def update_read_text(self, data):
         print(data)
