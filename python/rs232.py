@@ -164,7 +164,7 @@ class SerialKing:
 
     def read(self, size=1) -> bytes:
 
-        rlist, _, _ = select.select([self.fd], [], [], 0.01)
+        rlist, _, _ = select.select([self.fd], [], [], 0.001) #change before 0.01
         if rlist:
             return os.read(self.fd, size)
         return b''
@@ -193,16 +193,16 @@ class SerialReaderThread(QThread):
                     self.serial_king.clear_dtr()
 
             if chunk == b'\x00':
-                print('ping')
+                #print('ping')
                 self.serial_king.write(data=b'\x16')
                 chunk = b''
             if chunk == b'\x16':
-                print('pong')
+                #print('pong')
                 self.pong_received = True
                 chunk = b''
             if chunk:
                 buffer += chunk.decode(errors='ignore')
-                print(' '.join(f"0x{byte:02x}" for byte in chunk))
+                #print(' '.join(f"0x{byte:02x}" for byte in chunk))
                 if buffer.endswith(self.serial_king.terminator):
                     self.data_received.emit(buffer[:-len(self.serial_king.terminator)] + '\n')
                     buffer = ''

@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
                         print("DSR not received within timeout.")
                         self.reader_thread.sending_data = False
                         return
-                    time.sleep(0.01)
+                    time.sleep(0.001)
 
                 self.reader_thread.sending_data = False
                 self.serialKing.write(data_bytes)
